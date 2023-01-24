@@ -84,4 +84,4 @@ fi
 cat /proc/cpuinfo | grep MHz | tail -n1
 ipmitool sdr | grep CPU | grep Temp
 echo $[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°
-
+echo -e "\n"
