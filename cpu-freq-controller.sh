@@ -78,7 +78,6 @@ then
     else
         echo "cpu温度过高"
     fi
-    fi
 fi
 
 #打印系统信息
