@@ -26,7 +26,7 @@ cpu1_temp_ipmi_get=`ipmitool sdr | grep CPU1 | grep Temp | sed 's/[1-2]//' | sed
 cpu2_temp_ipmi_get=`ipmitool sdr | grep CPU2 | grep Temp | sed 's/[1-2]//' | sed 's/| ok//g' | sed 's/CPU Temp.*| //g' | sed 's/ degrees C//g'` #同上
 
 #检测命令是否安装
-if [! type cpufreq-set > /dev/null 2>&1 ] 
+if [ ! type cpufreq-set > /dev/null 2>&1 ] 
 then 
     echo "请安装cpufrequtils" 
     exit
