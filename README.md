@@ -5,4 +5,4 @@
 ## fan-mode-auto.sh
 专用超微x9主板风扇策略调节
 ## auto-start.sh
-自动开机，使用时需要设置 expect_date变量，例如：export expect_date=6:30 && /patch/auto-start.sh
+自动开机，使用时需要设置 expect_date变量，例如：export expect_date=6:30 && /path/auto-start.sh
