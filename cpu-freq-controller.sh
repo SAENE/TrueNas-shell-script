@@ -37,7 +37,11 @@ then
     echo "请安装cpufrequtils" 
     exit
 fi
-
+#监测最大cpu占用应用数值是否为0
+if [[ ${app_use_max_cpu} -eq 0 ]]
+then
+    app_use_max_cpu=`top -bcn 1 -w 200 | sed -n '8,20p' | sed 's/.*plexmediaserver.*//g' | sed 's/.*Emby.*//g' | sed 's/.*qemu.*//g' | awk -F'[" "%]+' '{print $10}' | sed 's/\..//g' | sed '/^\s*$/d' | sed -n '1p'`
+fi
 #根据温度调节风扇策略
 
 
