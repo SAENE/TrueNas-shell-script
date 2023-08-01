@@ -21,8 +21,8 @@ mkdir -p $bak_dir/$DATE
 # 停止Emby Server容器服务
 
 cd $embyserver_dir
-rar a -r -m5 ${bak_dir}/${DATE}/UBS-Docker.rar ./
-#targz $bak_dir/${DATE}/emby-server.tar.gz ./
+#rar a -r -m5 ${bak_dir}/${DATE}/UBS-Docker.rar ./
+targz $bak_dir/${DATE}/emby-server.tar.gz ./
 echo "UBS-Docker备份完成······"
 # 启动Emby Server容器服务
 
