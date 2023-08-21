@@ -12,13 +12,13 @@ cpu_super_temp_limit=80 #高温温度
 cpu_super_temp_plus_limit=90 #紧急温度
 
 ##频率设置
-cpu_normal_temp_limit_max_freq=`expr 3200 \* 1000` #正常温度频率
+cpu_normal_temp_limit_max_freq=`expr 3000 \* 1000` #正常温度最大频率
 cpu_normal_temp_limit_nomarl_freq=`expr 1200 \* 1000` #正常温度频率
-cpu_super_temp_limit_max_freq=`expr 2400 \* 1000` #高温温度频率
-cpu_super_temp_limit_plus_max_freq=`expr 1400 \* 1000` #紧急温度频率
+cpu_super_temp_limit_max_freq=`expr 2600 \* 1000` #高温温度频率
+cpu_super_temp_limit_plus_max_freq=`expr 2000 \* 1000` #紧急温度频率
 cpu_temp_limit_min_freq=`expr 1200 \* 1000` #最低频率
 cpu_min_idle=40 #cpu最小占空比
-app_use_max_cpu_limit=120
+app_use_max_cpu_limit=90
 
 ##客观变量获取命令
 fan_mode_get=`ipmitool raw 0x30 0x45 0x00`
@@ -51,18 +51,20 @@ if [[  ${cpu2_temp_ipmi_get} -lt ${cpu_normal_temp_limit} && ${cpu1_temp_ipmi_ge
 then
     if [[ ${app_use_max_cpu} -ge ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -le ${cpu_normal_temp_limit_nomarl_freq} || ${cpu_idle} -le ${cpu_min_idle} && `${cpu_max_freq_get}` -le ${cpu_normal_temp_limit_nomarl_freq} ]]
         then
-            echo '有应用高占用，正在提高cpu性能'
+            echo "判断1"
+            echo '有应用高占用，正在提高cpu性能，风扇模式改为Full Speed'
             for((i=0;i<=39;i++));
             do
                 cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_normal_temp_limit_max_freq}
             done
-            ipmitool raw 0x30 0x45 0x01 0x00
+            ipmitool raw 0x30 0x45 0x01 0x01
             ipmitool sensor thresh "CPU1 Temp" upper 110 110 110
             ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
     elif [[ ${app_use_max_cpu} -lt ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
     then
         if [[ ${cpu_idle} -gt ${cpu_min_idle} && `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
         then
+            echo "判断2"
             echo "cpu温度正常，正在恢复设置"
             echo "cpu占用低，正在降低cpu性能"
             for((i=0;i<=39;i++));
@@ -77,11 +79,13 @@ then
                 ipmitool raw 0x30 0x45 0x01 0x02
             fi
         else
+            echo "判断3"
             echo "cpu处于高性能模式"
             echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式Standard Speed"
             echo "cpu温度正常"
         fi
     else
+        echo "判断4"
         if [[ ${fan_mode_get} -eq " 02" ]]
         then
         echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Optimal Speed"
@@ -101,6 +105,7 @@ elif [[ ${cpu1_temp_ipmi_get} -ge ${cpu_super_temp_plus_limit} || ${cpu2_temp_ip
 then
     if [[ `${cpu_max_freq_get}` -gt ${cpu_super_temp_limit_plus_max_freq} ]]
     then
+        echo "判断5"
         echo "cpu温度超高,设置频率为${cpu_super_temp_limit_plus_max_freq}"
         for((i=0;i<=39;i++));
         do
@@ -115,7 +120,15 @@ then
         else
             echo "无需修改，CPU温度大于${cpu_super_temp_plus_limit}，风扇模式为Full Speed"
         fi
+    elif [[ `${cpu_max_freq_get}` -eq ${cpu_super_temp_limit_plus_max_freq} ]]
+    then
+        echo "判断8"
+        for((i=0;i<=39;i++));
+        do
+            cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_temp_limit_min_freq}
+        done
     else
+        echo "判断10"
         echo "cpu温度超高"
     fi
 ##高温温度频率调节
@@ -123,7 +136,8 @@ elif [[ ${cpu1_temp_ipmi_get} -ge ${cpu_super_temp_limit} || ${cpu2_temp_ipmi_ge
 then
     if [[ `${cpu_max_freq_get}` -gt ${cpu_super_temp_limit_max_freq} ]]
     then
-         echo "cpu温度超高,设置频率为${cpu_super_temp_limit_max_freq}"
+        echo "判断6"
+        echo "cpu温度超高,设置频率为${cpu_super_temp_limit_max_freq}"
         for((i=0;i<=39;i++));
         do
             cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_super_temp_limit_max_freq}
@@ -138,9 +152,11 @@ then
             echo "无需修改，CPU温度大于${cpu_super_temp_limit}，风扇模式为Full Speed"
         fi
     else
+        echo "判断9"
         echo "cpu温度过高"
     fi
 else
+    echo "判断7"
     if [[ ${fan_mode_get} -eq " 02" ]]
     then
     echo "无需修改，风扇模式为Optimal Speed"
