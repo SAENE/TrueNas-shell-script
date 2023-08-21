@@ -26,7 +26,7 @@ targz $bak_dir/${DATE}/emby-server.tar.gz ./
 echo "UBS-Docker备份完成······"
 # 启动Emby Server容器服务
 
-
+cd ${bak_dir}
 # 遍历备份目录下的日期目录
 LIST=$(ls $bak_dir)
 # 获取7天前的时间，用于作比较，早于该时间的文件将删除
@@ -42,7 +42,7 @@ do
         # 与当天的时间做对比，把早于7天的备份文件删除
         if [ $(( $SECONDS- $indexSecond )) -gt 0 ]
         then
-            rm -rf $index
+            rm -rf `echo $index | sed ':a;N;$!ba;s/\n/ /g'`
         fi
     fi
 done
