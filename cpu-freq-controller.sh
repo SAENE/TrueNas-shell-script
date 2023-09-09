@@ -17,6 +17,7 @@ cpu_normal_temp_limit_nomarl_freq=`expr 1200 \* 1000` #正常温度频率
 cpu_super_temp_limit_max_freq=`expr 2600 \* 1000` #高温温度频率
 cpu_super_temp_limit_plus_max_freq=`expr 2000 \* 1000` #紧急温度频率
 cpu_temp_limit_min_freq=`expr 1200 \* 1000` #最低频率
+cpu_temp_limit_min_freq2=`expr 2400 \* 1000` #最低频率
 cpu_min_idle=40 #cpu最小占空比
 app_use_max_cpu_limit=90
 
@@ -29,7 +30,9 @@ cpu_temp_sys_get="echo $[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]" #�
 cpu1_temp_ipmi_get=`ipmitool sdr | grep CPU1 | grep Temp | sed 's/[1-2]//' | sed 's/| ok//g' | sed 's/CPU Temp.*| //g' | sed 's/ degrees C//g'` #通过ipmi获取cpu温度
 cpu2_temp_ipmi_get=`ipmitool sdr | grep CPU2 | grep Temp | sed 's/[1-2]//' | sed 's/| ok//g' | sed 's/CPU Temp.*| //g' | sed 's/ degrees C//g'` #同上
 cpu_idle=`top -bcn 1 -w 200 | grep '%Cpu(s)' | sed 's/.*ni,//g' | sed 's/\..*id,.*//g' | awk -F'[" "%]+' '{print $2}' | sed 's/root//g' | sed -n '1p'` #cpu占空比获取
-app_use_max_cpu=`top -bcn 1 -w 200 | sed -n '8,20p' | sed 's/.*plexmediaserver.*//g' | sed 's/.*qbittorrent.*//g' | sed 's/.*Emby.*//g' | sed 's/.*qemu.*//g' | sed 's/.*S//g' | sed 's/.*R//g' | sed 's/.*I//g' | sed 's/.*top -bcn.*//g' | awk -F'[" "%]+' '{print $2}' | sed 's/\..//g' | sed '/^\s*$/d' | sed -n '1p'`
+app_use_max_cpu=`top -bcn 1 -w 200 | head -n 20 | sed -n "8p"  | awk {'print $9'} | awk -F '.' '{print $1}'`
+#app_use_max_cpu=`top -bcn 1 -w 200 | sed 's/.*plexmediaserver.*\n//g' | sed 's/.*qbittorrent.*\n//g' | sed 's/.*Emby.*\n//g' | sed 's/.*qemu.*\n//g' | head -n 20 | sed -n "8p"  | awk {'print $9'} | awk -F '.' '{print $1}'`
+#app_use_max_cpu=`top -bcn 1 -w 200 | sed -n '8,20p' | sed 's/.*plexmediaserver.*\n//g' | sed 's/.*qbittorrent.*\n//g' | sed 's/.*Emby.*\n//g' | sed 's/.*qemu.*\n//g' | sed 's/.*S\n//g' | sed 's/.*R\n//g' | sed 's/.*I\n//g' | sed 's/.*top -bcn.*\n//g' | awk -F'[" "%]+' '{print $2}' | sed 's/\..//g' | sed '/^\s*$/d' | sed -n '1p'`
 
 #检测命令是否安装
 if [ ! type cpufreq-set > /dev/null 2>&1 ]
@@ -40,7 +43,7 @@ fi
 #监测最大cpu占用应用数值是否为0
 if [[ ${app_use_max_cpu} -eq 0 ]]
 then
-    app_use_max_cpu=`top -bcn 1 -w 200 | sed -n '8,20p' | sed 's/.*plexmediaserver.*//g' | sed 's/.*qbittorrent.*//g' | sed 's/.*Emby.*//g' | sed 's/.*qemu.*//g' | sed 's/.*S//g' | sed 's/.*R//g' | sed 's/.*I//g' | sed 's/.*top -bcn.*//g' | awk -F'[" "%]+' '{print $2}' | sed 's/\..//g' | sed '/^\s*$/d' | sed -n '1p'`
+    app_use_max_cpu=`top -bcn 1 -w 200 | sed 's/.*plexmediaserver.*\n//g' | sed 's/.*qbittorrent.*\n//g' | sed 's/.*Emby.*\n//g' | sed 's/.*qemu.*\n//g' | head -n 20 | sed -n "8p"  | awk {'print $9'} | awk -F '.' '{print $1}'`
 fi
 #根据温度调节风扇策略
 
@@ -52,12 +55,12 @@ then
     if [[ ${app_use_max_cpu} -ge ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -le ${cpu_normal_temp_limit_nomarl_freq} || ${cpu_idle} -le ${cpu_min_idle} && `${cpu_max_freq_get}` -le ${cpu_normal_temp_limit_nomarl_freq} ]]
         then
             echo "判断1"
-            echo '有应用高占用，正在提高cpu性能，风扇模式改为Full Speed'
+            echo '有应用高占用，正在提高cpu性能，风扇模式改为Standard Speed'
             for((i=0;i<=39;i++));
             do
-                cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_normal_temp_limit_max_freq}
+                cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq2} -u ${cpu_normal_temp_limit_max_freq}
             done
-            ipmitool raw 0x30 0x45 0x01 0x01
+            ipmitool raw 0x30 0x45 0x01 0x00
             ipmitool sensor thresh "CPU1 Temp" upper 110 110 110
             ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
     elif [[ ${app_use_max_cpu} -lt ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
@@ -140,7 +143,7 @@ then
         echo "cpu温度超高,设置频率为${cpu_super_temp_limit_max_freq}"
         for((i=0;i<=39;i++));
         do
-            cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_super_temp_limit_max_freq}
+            cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq2} -u ${cpu_super_temp_limit_max_freq}
         done
         ipmitool sensor thresh "CPU1 Temp" upper 110 110 110
         ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
