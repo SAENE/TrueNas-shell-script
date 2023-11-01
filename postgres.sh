@@ -7,7 +7,7 @@ DATE=$(date "+%Y%m%d%H%M")
 DEL_DAY=31
 
 #查询所有数据库
-#DATABASES=$(docker exec -i mariadb mariadb  -uroot -pyqyq2323 -e "show databases" | grep -Ev "Database|sys|information_schema|performance_schema|mysql")
+#DATABASES=$(docker exec -i mariadb mariadb  -uroot -p -e "show databases" | grep -Ev "Database|sys|information_schema|performance_schema|mysql")
 ##循环数据库进行备份
 #echo $DATABASES
 #for db in $DATABASES
@@ -17,7 +17,7 @@ DEL_DAY=31
 #        echo "jump over ${db}"
 #    else
 #        echo ----------$BACKUP_FILEDIR/${db}_$DATE.sql.gz BEGIN----------
-#        docker exec -i mariadb  mariadb-dump -uroot -pyqyq2323 --default-character-set=utf8 -q --lock-all-tables --flush-logs -E -R --triggers -B ${db} | gzip > $BACKUP_FILEDIR/${db}_$DATE.sql.gz
+#        docker exec -i mariadb  mariadb-dump -uroot -p --default-character-set=utf8 -q --lock-all-tables --flush-logs -E -R --triggers -B ${db} | gzip > $BACKUP_FILEDIR/${db}_$DATE.sql.gz
 #        echo ${db}
 #        echo ----------$BACKUP_FILEDIR/${db}_$DATE.sql.gz COMPLETE----------
 #        echo
