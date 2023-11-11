@@ -7,9 +7,9 @@ date  +"%Y-%m-%d %H:%M.%S"
 cpu_power_mode="performance" #conservative performance powersave  ondemand
 
 ##温度设置
-cpu_normal_temp_limit=70 #正常温度
-cpu_super_temp_limit=80 #高温温度
-cpu_super_temp_plus_limit=90 #紧急温度
+cpu_normal_temp_limit=80 #正常温度
+cpu_super_temp_limit=90 #高温温度
+cpu_super_temp_plus_limit=95 #紧急温度
 
 ##频率设置
 cpu_normal_temp_limit_max_freq=`expr 3000 \* 1000` #正常温度最大频率
