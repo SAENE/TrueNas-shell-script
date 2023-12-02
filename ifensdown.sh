@@ -1,7 +1,8 @@
 #!/bin/bash
 date
-for num_list in 1 2
+for num_list in 1 2 3
 do
+ens_up_num=0
 ens_status=1
 echo "本次脚本第${num_list}个循环"
 ens12_status=`ip link | grep enp12s0 | grep -o DOWN`
@@ -34,9 +35,10 @@ else
 	echo "有张网卡已连接，无需拉起"
 fi
 
-if [[ ${num_list} -eq 1  ]]
+if [[ ${num_list} -lt 3  ]]
 then
-	sleep 30s
+	sleep 15s
+	echo -e '\n'
 fi
 done
 echo -e '\n\n'
