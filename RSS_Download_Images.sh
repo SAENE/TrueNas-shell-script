@@ -38,7 +38,8 @@ do
     # 创建标题名称的文件夹
     mkdir "${save_path}/${description_title}"
     # 获取图片地址
-    description_imgurl=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | egrep -o "https.+(jpg|png|bmp|tif|jpeg|svg|webp|exif|gif|raw)\"" | sed 's/" referrerpolicy="no-referrer"><\/p><p><img src="/ /g' | sed 's/"$//g'`
+    # description_imgurl=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | egrep -o "https.+(jpg|png|bmp|tif|jpeg|svg|webp|exif|gif|raw)\"" | sed 's/" referrerpolicy="no-referrer"><\/p><p><img src="/ /g' | sed 's/"$//g'`
+    description_imgurl=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | egrep -o "https.+\"" | sed 's/" referrerpolicy="no-referrer"><\/p><p><img src="/ /g' | sed 's/" referrerpolicy="no-referrer"//g'`
     # 下载图片
     wget ${description_imgurl} -P "${save_path}/${description_title}/" 2>> "${save_path}/wget-error.log"
     # 
