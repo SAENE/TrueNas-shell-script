@@ -2,11 +2,18 @@
 echo "----------脚本执行开始----------"
 date
 # 保存路径
-save_path=/config/workspace/TrueNas-shell-script/download
-echo "保存路径为${save_path}"
-mkdir ${save_path}
-# rss订阅地址(一定要转义)
-rss_url=https://rss.rss/i/\?a\=rss\&get\=c_8\&rid\=\&hours\=
+save_path=/mnt/volume-pool/volume/我的资源/影音娱乐/本子/Pixiv
+# 判断路径是否存在
+if [ -e "${save_path}" ]
+then
+    echo "保存路径为${save_path}"
+else
+    echo "创建保存路径${save_path}"
+    mkdir ${save_path}
+    echo "保存路径为${save_path}"
+fi
+# rss订阅地址
+rss_url=https://rss.rss/i/\?a\=rss\&get\=c_8\&rid\=\&hours\=168
 
 # 下载订阅信息
 echo "----------下载订阅----------"
@@ -30,15 +37,20 @@ until [ ! $i -le ${description_cont} ]
 do
     # description_title=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | sed 's/.*<\!\[CDATA\[<p>\(.*\)<\/p><br><p><img.*/\1/g'`
     # description_title=`cat ${save_path}/rss.xml | sed ':a;N;$!ba;s/\(.*<\/title>\)\n/\1/g' | sed ':a;N;$!ba;s/\(.*<\/link>\)\n/\1/g' | sed ':a;N;$!ba;s/\(.*<\/dc:creator>\)\n/\1/g' | grep '<description>' | sed -n ${i}p | sed 's/.*<\!\[CDATA\[<p>\(.*\)<\/p><br><p><img.*/\1/g'`
-    # 获取标题名称
-    description_title=`cat ${save_path}/rss.xml | grep '<title>'  | sed -n ${i}p | sed 's/<title>\(.*\)<\/title>/\1/g' | sed 's/^[[:space:]]*//g'`
-
+    # 获取标题名称（会删除#开头的序号）
+    description_title=`cat ${save_path}/rss.xml | grep '<title>'  | sed -n ${i}p | sed 's/<title>\(.*\)<\/title>/\1/g' | sed 's/#[0-9]\{1,2\}[[:space:]]*//g' | sed 's/^[[:space:]]*//g'`
+    
     echo "正在下载第${i}个，${description_title}"
 
     # 创建标题名称的文件夹
-    mkdir "${save_path}/${description_title}"
+    if [ -e "${save_path}/${description_title}" ]
+    then
+    echo ""
+    else
+        mkdir "${save_path}/${description_title}"
+    fi
     # 获取图片地址
-    # description_imgurl=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | egrep -o "https.+(jpg|png|bmp|tif|jpeg|svg|webp|exif|gif|raw)\"" | sed 's/" referrerpolicy="no-referrer"><\/p><p><img src="/ /g' | sed 's/"$//g'`
+    # description_imgurl=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | egrep -o "https.+(jpg|png)\"" | sed 's/" referrerpolicy="no-referrer"><\/p><p><img src="/ /g' | sed 's/"$//g'`
     description_imgurl=`cat ${save_path}/rss.xml | grep '<description>' | sed -n ${i}p | egrep -o "https.+\"" | sed 's/" referrerpolicy="no-referrer"><\/p><p><img src="/ /g' | sed 's/" referrerpolicy="no-referrer"//g'`
     # 下载图片
     wget -N ${description_imgurl} -P "${save_path}/${description_title}/" 2>> "${save_path}/wget-error.log"
@@ -50,6 +62,19 @@ echo "----------下载完成----------"
 echo "----------删除订阅文件----------"
 rm ${save_path}/rss.xml
 echo "----------删除文件完成----------"
+
+echo "----------移动当前目录下图片----------"
+if [ -e "${save_path}/无题" ]
+then
+    echo ""
+else
+    echo "创建保存路径${save_path}/无题"
+    mkdir ${save_path}/无题
+fi
+mv *.jpg ${save_path}/无题/
+mv *.png ${save_path}/无题/
+mv *.gif ${save_path}/无题/
+echo "----------移动完成----------"
 
 echo "----------脚本执行结束----------"
 echo -e '\n\n'
