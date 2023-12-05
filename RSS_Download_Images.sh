@@ -71,9 +71,9 @@ else
     echo "创建保存路径${save_path}/无题"
     mkdir ${save_path}/无题
 fi
-mv *.jpg "${save_path}/无题/"
-mv *.png "${save_path}/无题/"
-mv *.gif "${save_path}/无题/"
+mv ${save_path}/*.jpg "${save_path}/无题/"
+mv ${save_path}/*.png "${save_path}/无题/"
+mv ${save_path}/*.gif "${save_path}/无题/"
 echo "----------移动完成----------"
 
 echo "----------脚本执行结束----------"
