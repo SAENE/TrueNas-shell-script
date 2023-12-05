@@ -4,7 +4,7 @@ date
 # 保存路径
 save_path=/config/workspace/TrueNas-shell-script/download
 echo "保存路径为${save_path}"
-mkdir /config/workspace/TrueNas-shell-script/download
+mkdir ${save_path}
 # rss订阅地址(一定要转义)
 rss_url=https://rss.rss/i/\?a\=rss\&get\=c_8\&rid\=\&hours\=
 
