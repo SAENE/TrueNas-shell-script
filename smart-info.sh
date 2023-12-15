@@ -15,5 +15,6 @@ for ((i=0;$i<${#disk_name[@]};i++))
         smartctl -A /dev/${disk_name[$i]}            | grep 'Current_Pending_Sector'  | sed 's/Current_Pending_Sector/等候重定的扇区计数(Current_Pending_Sector) /g'
         smartctl -A /dev/${disk_name[$i]}            | grep 'Offline_Uncorrectable'   | sed 's/Offline_Uncorrectable/无法校正的扇区计数(Offline_Uncorrectable) /g'
         smartctl -i -n standby /dev/${disk_name[$i]} | grep "mode"                    | sed 's/Power mode is/电源模式是(Power mode is)/g'
-        echo -e '\n\n\n'
+        smartctl -l error   /dev/${disk_name[$i]}    | sed -n 4,6p
+	echo -e '\n\n\n'
     done
