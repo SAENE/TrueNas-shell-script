@@ -88,12 +88,13 @@ echo "----------开始下载----------"
             echo "作者文件夹已存在"
         else
             mkdir "${save_path_category}/${descriptio_creator}"
-            if [ -e "${save_path_category}/${descriptio_creator}/${description_title}" ]
-            then
-                echo "标题文件夹已存在"
-            else
-                mkdir "${save_path_category}/${descriptio_creator}/${description_title}"
-            fi
+        fi
+        
+        if [ -e "${save_path_category}/${descriptio_creator}/${description_title}" ]
+        then
+            echo "标题文件夹已存在"
+        else
+            mkdir "${save_path_category}/${descriptio_creator}/${description_title}"
         fi
         echo -e "正在下载第${i}个，${descriptio_creator} 创作的 ${description_title}\n"
         # 获取图片地址
