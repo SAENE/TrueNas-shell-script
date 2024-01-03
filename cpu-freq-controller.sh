@@ -3,6 +3,14 @@
 date  +"%Y-%m-%d %H:%M.%S"
 
 #环境变量
+##设置可调参数
+night_quiet=enable
+force_quiet=false
+
+##夜晚模式开启以及关闭时间
+night_enable_time=00:00
+night_stop_time=06:00
+
 ##频率调节策略
 cpu_power_mode="performance" #conservative performance powersave  ondemand
 
@@ -22,6 +30,7 @@ cpu_min_idle=40 #cpu最小占空比
 app_use_max_cpu_limit=150
 
 ##客观变量获取命令
+now_date_time=`date +%s`
 fan_mode_get=`ipmitool raw 0x30 0x45 0x00`
 cpu_max_freq_get="cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq" #获取cpu0最高频率设置
 cpu_min_freq_get="cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq" #获取cpu0最低频率设置
@@ -34,6 +43,9 @@ cpu_idle=`top -bcn 1 -w 200 | grep '%Cpu(s)' | sed 's/.*ni,//g' | sed 's/\..*id,
 #app_use_max_cpu=`top -bcn 1 -w 200 | sed '/plexmediaserver/d' | sed '/qbittorrent/d' | sed '/Emby/d' | sed '/\/usr\/bin\/qemu/d' | head -n 20 | sed -n "8p"  | awk {'print $9'} | awk -F '.' '{print $1}'`
 app_use_max_cpu=`top -bcn 1 -w 200 | sed '/\/usr\/bin\/qemu/d' | head -n 20 | sed -n "8p"  | awk {'print $9'} | awk -F '.' '{print $1}'`
 #app_use_max_cpu=`top -bcn 1 -w 200 | sed -n '8,20p' | sed 's/.*plexmediaserver.*\n//g' | sed 's/.*qbittorrent.*\n//g' | sed 's/.*Emby.*\n//g' | sed 's/.*qemu.*\n//g' | sed 's/.*S\n//g' | sed 's/.*R\n//g' | sed 's/.*I\n//g' | sed 's/.*top -bcn.*\n//g' | awk -F'[" "%]+' '{print $2}' | sed 's/\..//g' | sed '/^\s*$/d' | sed -n '1p'`
+fan_mode_full="ipmitool raw 0x30 0x45 0x01 0x01"
+fan_mode_standard="ipmitool raw 0x30 0x45 0x01 0x00"
+fan_mode_optimal="ipmitool raw 0x30 0x45 0x01 0x02"
 
 #检测命令是否安装
 if [ ! type cpufreq-set > /dev/null 2>&1 ]
@@ -46,9 +58,86 @@ if [[ ${app_use_max_cpu} -eq 0 ]]
 then
     app_use_max_cpu=`top -bcn 1 -w 200 | sed 's/.*plexmediaserver.*\n//g' | sed 's/.*qbittorrent.*\n//g' | sed 's/.*Emby.*\n//g' | sed 's/.*qemu.*\n//g' | head -n 20 | sed -n "8p"  | awk {'print $9'} | awk -F '.' '{print $1}'`
 fi
-#根据温度调节风扇策略
-
-
+#夜晚模式以及强制模式
+if [[ ${force_quiet} = "enable" ]]
+then
+    echo "检测到强制安静模式已开启"
+    if [[ `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
+    then
+        echo "强制安静模式，CPU频率设置为最低"
+        for((i=0;i<=39;i++));
+        do
+            cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_normal_temp_limit_nomarl_freq}
+        done
+    fi
+    if [[ ${fan_mode_get} -ne " 02" ]]
+    then
+        ipmitool sensor thresh "CPU1 Temp" upper 105 105 105
+        ipmitool sensor thresh "CPU2 Temp" upper 105 105 105
+        echo "风扇模式改为Optimal Speed"
+        ipmitool raw 0x30 0x45 0x01 0x02
+    fi
+    echo "最大cpu占用应用${app_use_max_cpu}"
+    echo "cpu空占比 ${cpu_idle}%"
+    echo "cpu最大频率`${cpu_max_freq_get}`"
+    echo "cpu当前频率`cat /proc/cpuinfo | grep MHz | tail -n1` "
+    echo "运行时cpu1温度${cpu1_temp_ipmi_get}"
+    echo "运行时cpu2温度${cpu2_temp_ipmi_get}"
+    echo "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
+    echo "当前运行前8的程序"
+    top -bcn 1 -w 200  | sed -n '7,15p'
+    echo -e "\n"
+    exit 0
+elif [[ ${night_quiet} = "enable" ]]
+then
+    echo "检测到深夜安静模式已开启"
+    if [[ ${now_date_time} -ge  `date -d "${night_enable_time}" +%s` ]]
+    then
+        night_enable_time=`date -d "tomorrow ${night_enable_time}" +%s`
+    elif [[ ${now_date_time} -lt  `date -d "${night_enable_time}" +%s` ]]
+    then
+        night_enable_time=`date -d "${night_enable_time}" +%s`
+    fi
+    if [[ ${now_date_time} -ge  `date -d "${night_stop_time}" +%s` ]]
+    then
+        night_enable_time=`date -d "tomorrow ${night_stop_time}" +%s`
+    elif [[ ${now_date_time} -lt  `date -d "${night_stop_time}" +%s` ]]
+    then
+        night_enable_time=`date -d "${night_stop_time}" +%s`
+    fi
+    if [[ ${now_date_time} -ge ${night_enable_time} && ${now_date_time} -lt ${night_stop_time} ]]
+    then
+        if [[ `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
+        then
+            echo "深夜安静模式，CPU频率设置为最低"
+            for((i=0;i<=39;i++));
+            do
+                cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_normal_temp_limit_nomarl_freq}
+            done
+        fi
+        if [[ ${fan_mode_get} -ne " 02" ]]
+        then
+            ipmitool sensor thresh "CPU1 Temp" upper 105 105 105
+            ipmitool sensor thresh "CPU2 Temp" upper 105 105 105
+            echo "风扇模式改为Optimal Speed"
+            ipmitool raw 0x30 0x45 0x01 0x02
+        fi
+        echo "最大cpu占用应用${app_use_max_cpu}"
+        echo "cpu空占比 ${cpu_idle}%"
+        echo "cpu最大频率`${cpu_max_freq_get}`"
+        echo "cpu当前频率`cat /proc/cpuinfo | grep MHz | tail -n1` "
+        echo "运行时cpu1温度${cpu1_temp_ipmi_get}"
+        echo "运行时cpu2温度${cpu2_temp_ipmi_get}"
+        echo "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
+        echo "当前运行前8的程序"
+        top -bcn 1 -w 200  | sed -n '7,15p'
+        echo -e "\n"
+        exit 0
+    fi
+    echo "不在深夜时间，执行正常模式"
+else
+    echo "正常模式"
+fi
 #根据温度调节cpu频率和风扇策略
 ##正常温度频率调节
 if [[  ${cpu2_temp_ipmi_get} -lt ${cpu_normal_temp_limit} && ${cpu1_temp_ipmi_get} -lt ${cpu_normal_temp_limit} && `${cpu_temp_sys_get}` -lt ${cpu_normal_temp_limit} ]]
@@ -56,12 +145,12 @@ then
     if [[ ${app_use_max_cpu} -ge ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -le ${cpu_super_temp_limit_max_freq} || ${cpu_idle} -le ${cpu_min_idle} && `${cpu_max_freq_get}` -le ${cpu_super_temp_limit_max_freq} ]]
         then
             echo "判断1"
-            echo '有应用高占用，正在提高cpu性能，风扇模式改为Full Speed'
+            echo '有应用高占用，正在提高cpu性能，风扇模式改为Standard Speed'
             for((i=0;i<=39;i++));
             do
                 cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq2} -u ${cpu_normal_temp_limit_max_freq}
             done
-            ipmitool raw 0x30 0x45 0x01 0x01
+            ipmitool raw 0x30 0x45 0x01 0x00
             ipmitool sensor thresh "CPU1 Temp" upper 110 110 110
             ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
     elif [[ ${app_use_max_cpu} -lt ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
@@ -150,10 +239,10 @@ then
         ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
         if [[ ${fan_mode_get} -ne " 01" ]]
         then
-            echo "CPU温度大于${cpu_super_temp_limit}，风扇模式改为Full Speed"
-            ipmitool raw 0x30 0x45 0x01 0x01
+            echo "CPU温度大于${cpu_super_temp_limit}，风扇模式改为Standard Speed"
+            ipmitool raw 0x30 0x45 0x01 0x00
         else
-            echo "无需修改，CPU温度大于${cpu_super_temp_limit}，风扇模式为Full Speed"
+            echo "无需修改，CPU温度大于${cpu_super_temp_limit}，风扇模式为Standard Speed"
         fi
     else
         echo "判断9"
