@@ -51,7 +51,7 @@ fan_mode_optimal="ipmitool raw 0x30 0x45 0x01 0x02"
 if [ ! type cpufreq-set > /dev/null 2>&1 ]
 then
     echo "请安装cpufrequtils"
-    exit
+    exit 1
 fi
 #监测最大cpu占用应用数值是否为0
 if [[ ${app_use_max_cpu} -eq 0 ]]
@@ -91,6 +91,7 @@ then
 elif [[ ${night_quiet} = "enable" ]]
 then
     echo "检测到深夜安静模式已开启"
+    date -d "$night_enable_time" +%s
     if [[ ${now_date_time} -ge  `date -d "${night_enable_time}" +%s` ]]
     then
         night_enable_time=`date -d "tomorrow ${night_enable_time}" +%s`
@@ -98,13 +99,15 @@ then
     then
         night_enable_time=`date -d "${night_enable_time}" +%s`
     fi
-    if [[ ${now_date_time} -ge  `date -d "${night_stop_time}" +%s` ]]
+    if [[ ${now_date_time} -gt  `date -d "${night_stop_time}" +%s` ]]
     then
-        night_enable_time=`date -d "tomorrow ${night_stop_time}" +%s`
+        night_stop_time=`date -d "tomorrow ${night_stop_time}" +%s`
     elif [[ ${now_date_time} -lt  `date -d "${night_stop_time}" +%s` ]]
     then
-        night_enable_time=`date -d "${night_stop_time}" +%s`
+        night_stop_time=`date -d "${night_stop_time}" +%s`
     fi
+    echo "${night_enable_time}"
+    echo "${night_stop_time}"
     if [[ ${now_date_time} -ge ${night_enable_time} && ${now_date_time} -lt ${night_stop_time} ]]
     then
         if [[ `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
