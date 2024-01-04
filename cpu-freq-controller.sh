@@ -8,7 +8,7 @@ night_quiet=enable
 force_quiet=false
 
 ##夜晚模式开启以及关闭时间
-night_enable_time=00:00
+night_enable_time=23:00
 night_stop_time=06:00
 
 ##频率调节策略
@@ -91,28 +91,42 @@ then
 elif [[ ${night_quiet} = "enable" ]]
 then
     echo "检测到深夜安静模式已开启"
-    date -d "$night_enable_time" +%s
-    if [[ ${now_date_time} -ge  `date -d "${night_enable_time}" +%s` ]]
+    echo "当前时间 ${now_date_time}"
+    if [[ ${now_date_time} -ge  `date -d "${night_enable_time}" +%s` && ${now_date_time} -ge `date -d "${night_stop_time}" +%s` ]]
     then
-        night_enable_time=`date -d "tomorrow ${night_enable_time}" +%s`
-    elif [[ ${now_date_time} -lt  `date -d "${night_enable_time}" +%s` ]]
+        night_enable_time=`date -d "yesterday ${night_enable_time}" +%s`
+        night_stop_time=`date -d "tomorrow ${night_stop_time}" +%s`
+    elif [[ ${now_date_time} -le  `date -d "${night_enable_time}" +%s` && ${now_date_time} -ge `date -d "${night_stop_time}" +%s` ]]
     then
         night_enable_time=`date -d "${night_enable_time}" +%s`
-    fi
-    if [[ ${now_date_time} -gt  `date -d "${night_stop_time}" +%s` ]]
-    then
         night_stop_time=`date -d "tomorrow ${night_stop_time}" +%s`
-    elif [[ ${now_date_time} -lt  `date -d "${night_stop_time}" +%s` ]]
+    elif [[ ${now_date_time} -le  `date -d "${night_enable_time}" +%s` && ${now_date_time} -le `date -d "${night_stop_time}" +%s` ]]
     then
+        night_enable_time=`date -d "yesterday ${night_enable_time}" +%s`
+        night_stop_time=`date -d "${night_stop_time}" +%s`
+    elif [[ ${now_date_time} -ge `date -d "${night_enable_time}" +%s` && ${now_date_time} -le `date -d "${night_stop_time}" +%s` && `date -d "${night_stop_time}" +%s` -lt `date -d "${night_enable_time}" +%s` ]]
+    then
+        night_enable_time=`date -d "${night_enable_time}" +%s`
+        night_stop_time=`date -d "tomorrow ${night_stop_time}" +%s`
+    elif [[ ${now_date_time} -ge `date -d "${night_enable_time}" +%s` && ${now_date_time} -le `date -d "${night_stop_time}" +%s` && `date -d "${night_stop_time}" +%s` -ge `date -d "${night_enable_time}" +%s` ]]
+    then
+        night_enable_time=`date -d "${night_enable_time}" +%s`
         night_stop_time=`date -d "${night_stop_time}" +%s`
     fi
-    echo "${night_enable_time}"
-    echo "${night_stop_time}"
-    if [[ ${now_date_time} -ge ${night_enable_time} && ${now_date_time} -lt ${night_stop_time} ]]
+    # if [[ ${night_enable_time} -gt  `date -d "${night_stop_time}" +%s` ]]
+    # then
+    #     night_stop_time=`date -d "tomorrow ${night_stop_time}" +%s`
+    # elif [[ ${night_enable_time} -lt  `date -d "${night_stop_time}" +%s` ]]
+    # then
+    #     night_stop_time=`date -d "${night_stop_time}" +%s`
+    # fi
+    echo "开启时间 ${night_enable_time}"
+    echo "关闭时间 ${night_stop_time}"
+    if [[ ${now_date_time} -ge ${night_enable_time} && ${now_date_time} -le ${night_stop_time} ]]
     then
+        echo "深夜安静模式，CPU频率设置为最低"
         if [[ `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
         then
-            echo "深夜安静模式，CPU频率设置为最低"
             for((i=0;i<=39;i++));
             do
                 cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_normal_temp_limit_nomarl_freq}
