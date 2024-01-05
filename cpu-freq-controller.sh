@@ -47,6 +47,58 @@ fan_mode_full="ipmitool raw 0x30 0x45 0x01 0x01"
 fan_mode_standard="ipmitool raw 0x30 0x45 0x01 0x00"
 fan_mode_optimal="ipmitool raw 0x30 0x45 0x01 0x02"
 
+##函数设置
+# 输出系统信息
+Debug_log(){
+    echo "最大cpu占用应用${app_use_max_cpu}"
+    echo "cpu空占比 ${cpu_idle}%"
+    echo "cpu最大频率`${cpu_max_freq_get}`"
+    echo "cpu当前频率`cat /proc/cpuinfo | grep MHz | tail -n1` "
+    echo "运行时cpu1温度${cpu1_temp_ipmi_get}"
+    echo "运行时cpu2温度${cpu2_temp_ipmi_get}"
+    echo "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
+    echo "当前运行前8的程序"
+    top -bcn 1 -w 200  | sed -n '7,15p'
+    echo -e "\n"
+}
+
+ipmi_sensor_cpu_upper(){
+    ipmitool sensor thresh "CPU1 Temp" upper ${1} ${1} ${1}
+    ipmitool sensor thresh "CPU2 Temp" upper ${1} ${1} ${1}
+}
+
+ipmi_fans_mode(){
+    ipmitool raw 0x30 0x45 0x01 0x0${1}
+    fan_mode_get=`ipmitool raw 0x30 0x45 0x00`
+    if [[ ${fan_mode_get} -eq " 02" ]]
+    then
+        echo "风扇模式设置为Optimal Speed"
+    fi
+    if [[ ${fan_mode_get} -eq " 01" ]]
+    then
+        echo "风扇模式设置为Full Speed"
+    fi
+    if [[ ${fan_mode_get} -eq " 00" ]]
+    then
+        echo "风扇模式设置为Standard Speed"
+    fi
+}
+
+ipmi_fans_get(){
+    if [[ ${fan_mode_get} -eq " 02" ]]
+    then
+        echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Optimal Speed"
+    fi
+    if [[ ${fan_mode_get} -eq " 01" ]]
+    then
+        echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Full Speed"
+    fi
+    if [[ ${fan_mode_get} -eq " 00" ]]
+    then
+        echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Standard Speed"
+    fi
+}
+
 #检测命令是否安装
 if [ ! type cpufreq-set > /dev/null 2>&1 ]
 then
@@ -72,21 +124,10 @@ then
     fi
     if [[ ${fan_mode_get} -ne " 02" ]]
     then
-        ipmitool sensor thresh "CPU1 Temp" upper 105 105 105
-        ipmitool sensor thresh "CPU2 Temp" upper 105 105 105
-        echo "风扇模式改为Optimal Speed"
-        ipmitool raw 0x30 0x45 0x01 0x02
+        ipmi_sensor_cpu_upper 105
+        ipmi_fans_mode 2 # 风扇模式设置为Optimal
     fi
-    echo "最大cpu占用应用${app_use_max_cpu}"
-    echo "cpu空占比 ${cpu_idle}%"
-    echo "cpu最大频率`${cpu_max_freq_get}`"
-    echo "cpu当前频率`cat /proc/cpuinfo | grep MHz | tail -n1` "
-    echo "运行时cpu1温度${cpu1_temp_ipmi_get}"
-    echo "运行时cpu2温度${cpu2_temp_ipmi_get}"
-    echo "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
-    echo "当前运行前8的程序"
-    top -bcn 1 -w 200  | sed -n '7,15p'
-    echo -e "\n"
+    Debug_log
     exit 0
 elif [[ ${night_quiet} = "enable" ]]
 then
@@ -113,13 +154,6 @@ then
         night_enable_time=`date -d "${night_enable_time}" +%s`
         night_stop_time=`date -d "${night_stop_time}" +%s`
     fi
-    # if [[ ${night_enable_time} -gt  `date -d "${night_stop_time}" +%s` ]]
-    # then
-    #     night_stop_time=`date -d "tomorrow ${night_stop_time}" +%s`
-    # elif [[ ${night_enable_time} -lt  `date -d "${night_stop_time}" +%s` ]]
-    # then
-    #     night_stop_time=`date -d "${night_stop_time}" +%s`
-    # fi
     echo "开启时间 ${night_enable_time}"
     echo "关闭时间 ${night_stop_time}"
     if [[ ${now_date_time} -ge ${night_enable_time} && ${now_date_time} -le ${night_stop_time} ]]
@@ -134,21 +168,10 @@ then
         fi
         if [[ ${fan_mode_get} -ne " 02" ]]
         then
-            ipmitool sensor thresh "CPU1 Temp" upper 105 105 105
-            ipmitool sensor thresh "CPU2 Temp" upper 105 105 105
-            echo "风扇模式改为Optimal Speed"
-            ipmitool raw 0x30 0x45 0x01 0x02
+            ipmi_sensor_cpu_upper 105
+            ipmi_fans_mode 2 # 风扇模式设置为Optimal
         fi
-        echo "最大cpu占用应用${app_use_max_cpu}"
-        echo "cpu空占比 ${cpu_idle}%"
-        echo "cpu最大频率`${cpu_max_freq_get}`"
-        echo "cpu当前频率`cat /proc/cpuinfo | grep MHz | tail -n1` "
-        echo "运行时cpu1温度${cpu1_temp_ipmi_get}"
-        echo "运行时cpu2温度${cpu2_temp_ipmi_get}"
-        echo "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
-        echo "当前运行前8的程序"
-        top -bcn 1 -w 200  | sed -n '7,15p'
-        echo -e "\n"
+        Debug_log
         exit 0
     fi
     echo "不在深夜时间，执行正常模式"
@@ -162,14 +185,12 @@ then
     if [[ ${app_use_max_cpu} -ge ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -le ${cpu_super_temp_limit_max_freq} || ${cpu_idle} -le ${cpu_min_idle} && `${cpu_max_freq_get}` -le ${cpu_super_temp_limit_max_freq} ]]
         then
             echo "判断1"
-            echo '有应用高占用，正在提高cpu性能，风扇模式改为Standard Speed'
             for((i=0;i<=39;i++));
             do
                 cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq2} -u ${cpu_normal_temp_limit_max_freq}
             done
-            ipmitool raw 0x30 0x45 0x01 0x00
-            ipmitool sensor thresh "CPU1 Temp" upper 110 110 110
-            ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
+            ipmi_fans_mode 0 # 风扇模式设置为Standard
+            ipmi_sensor_cpu_upper 110
     elif [[ ${app_use_max_cpu} -lt ${app_use_max_cpu_limit} && `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
     then
         if [[ ${cpu_idle} -gt ${cpu_min_idle} && `${cpu_max_freq_get}` -gt ${cpu_normal_temp_limit_nomarl_freq} ]]
@@ -183,31 +204,19 @@ then
             done
             if [[ ${fan_mode_get} -ne " 02" ]]
             then
-                ipmitool sensor thresh "CPU1 Temp" upper 105 105 105
-                ipmitool sensor thresh "CPU2 Temp" upper 105 105 105
-                echo "CPU温度小于${cpu_normal_temp_limit}，风扇模式改为Optimal Speed"
-                ipmitool raw 0x30 0x45 0x01 0x02
+                ipmi_sensor_cpu_upper 105
+                echo "CPU温度小于${cpu_normal_temp_limit}"
+                ipmi_fans_mode 2 # 风扇模式设置为Optimal
             fi
         else
             echo "判断3"
             echo "cpu处于高性能模式"
-            echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式Standard Speed"
+            ipmi_fans_get
             echo "cpu温度正常"
         fi
     else
         echo "判断4"
-        if [[ ${fan_mode_get} -eq " 02" ]]
-        then
-        echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Optimal Speed"
-        fi
-        if [[ ${fan_mode_get} -eq " 01" ]]
-        then
-        echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Full Speed"
-        fi
-        if [[ ${fan_mode_get} -eq " 00" ]]
-        then
-        echo "无需修改，CPU温度小于${cpu_normal_temp_limit}，风扇模式为Standard Speed"
-        fi
+        ipmi_fans_get
         echo "cpu温度正常"
     fi
 ##紧急温度频率调节
@@ -221,8 +230,7 @@ then
         do
             cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq} -u ${cpu_super_temp_limit_plus_max_freq}
         done
-        ipmitool sensor thresh "CPU1 Temp" upper 120 120 120
-        ipmitool sensor thresh "CPU2 Temp" upper 120 120 120
+        ipmi_sensor_cpu_upper 120
         if [[ ${fan_mode_get} -ne " 01" ]]
         then
             echo "CPU温度大于${cpu_super_temp_plus_limit}，风扇模式改为Full Speed"
@@ -252,8 +260,7 @@ then
         do
             cpufreq-set -c $i -g ${cpu_power_mode} -d ${cpu_temp_limit_min_freq2} -u ${cpu_super_temp_limit_max_freq}
         done
-        ipmitool sensor thresh "CPU1 Temp" upper 110 110 110
-        ipmitool sensor thresh "CPU2 Temp" upper 110 110 110
+        ipmi_sensor_cpu_upper 110
         if [[ ${fan_mode_get} -ne " 01" ]]
         then
             echo "CPU温度大于${cpu_super_temp_limit}，风扇模式改为Standard Speed"
@@ -267,29 +274,9 @@ then
     fi
 else
     echo "判断7"
-    if [[ ${fan_mode_get} -eq " 02" ]]
-    then
-    echo "无需修改，风扇模式为Optimal Speed"
-    fi
-    if [[ ${fan_mode_get} -eq " 01" ]]
-    then
-    echo "无需修改，风扇模式为Full Speed"
-    fi
-    if [[ ${fan_mode_get} -eq " 00" ]]
-    then
-    echo "无需修改，风扇模式为Standard Speed"
-    fi
+    ipmi_fans_get
     echo "cpu温度正常"
 fi
 
 #打印系统信息
-echo "最大cpu占用应用${app_use_max_cpu}"
-echo "cpu空占比 ${cpu_idle}%"
-echo "cpu最大频率`${cpu_max_freq_get}`"
-echo "cpu当前频率`cat /proc/cpuinfo | grep MHz | tail -n1` "
-echo "运行时cpu1温度${cpu1_temp_ipmi_get}"
-echo "运行时cpu2温度${cpu2_temp_ipmi_get}"
-echo "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
-echo "当前运行前8的程序"
-top -bcn 1 -w 200  | sed -n '7,15p'
-echo -e "\n"
+Debug_log
