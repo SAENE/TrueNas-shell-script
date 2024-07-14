@@ -583,21 +583,35 @@ fi
 # 如果温度低于正常温度限制，则开始下一步
 if [[ "${cpu_temp_high_get}" -lt "${cpu_normal_temp_limit}" ]];then
     # 如果空占比低或者应用占CPU高，频率低，则提高频率
-    if [[ "${app_use_max_cpu}" -ge "${app_use_max_cpu_limit}" && "${cpu_max_freq_get}" -le "${cpu_super_temp_limit_max_freq}" || "${cpu_idle}" -le "${cpu_min_idle}" && "${cpu_max_freq_get}" -le "${cpu_super_temp_limit_max_freq}" ]];then
+    if [[ "${cpu_max_freq_get}" -le "${cpu_super_temp_limit_max_freq}" ]];then
+        log_debug "CPU最大频率小于等于${cpu_super_temp_limit_max_freq}"
+        if [[ "${app_use_max_cpu}" -ge "${app_use_max_cpu_limit}" || "${cpu_idle}" -le "${cpu_min_idle}" ]];then
+            log_debug "有高占比应用 或者 CPU空占比低"
             log_info "提高频率，最大频率设置为${cpu_normal_temp_limit_max_freq}、最小频率设置为${cpu_temp_limit_min_freq}"
             cpu_freq_set ${cpu_high_freq_power_mode} ${cpu_normal_temp_limit_max_freq} ${cpu_temp_limit_min_freq}
             # 风扇模式设置为Standard
             ipmi_fans_mode_set 00
             ipmi_sensor_cpu_upper 110 110 115
+        else
+            log_debug "无高战比 CPU空闲，最低频率运行"
+            ipmi_fans_mode_get
+        fi
     # 如果进入高温或者紧急模式，并且空占比高或者应用占CPU低，则提高频率
-    elif [[ "${app_use_max_cpu}" -lt "${app_use_max_cpu_limit}" && "${cpu_max_freq_get}" -gt "${cpu_temp_limit_min_freq}" || "${cpu_idle}" -gt "${cpu_min_idle}" && "${cpu_max_freq_get}" -gt "${cpu_temp_limit_min_freq}" ]];then
-        log_info "cpu温度正常，正在恢复设置"
-        log_info "降低频率，频率设置为${cpu_temp_limit_min_freq}"
-        cpu_freq_set ${cpu_power_mode} ${cpu_temp_limit_min_freq} ${cpu_temp_limit_min_freq}
-        if [[ "${fan_mode_get}" -ne "02" ]];then
-            log_info "降低风扇转速"
-            ipmi_sensor_cpu_upper 105 105 110
-            ipmi_fans_mode_set 02
+    elif [[ "${cpu_max_freq_get}" -gt "${cpu_temp_limit_min_freq}" ]];then
+        log_debug "CPU最大频率大于${cpu_temp_limit_min_freq}"
+        if [[ "${app_use_max_cpu}" -lt "${app_use_max_cpu_limit}" && "${cpu_idle}" -gt "${cpu_min_idle}" ]];then
+            log_debug "无高占比应用 或者 CPU空闲"
+            log_info "cpu温度正常，正在恢复设置"
+            log_info "降低频率，频率设置为${cpu_temp_limit_min_freq}"
+            cpu_freq_set ${cpu_power_mode} ${cpu_temp_limit_min_freq} ${cpu_temp_limit_min_freq}
+            if [[ "${fan_mode_get}" -ne "02" ]];then
+                log_info "降低风扇转速"
+                ipmi_sensor_cpu_upper 105 105 110
+                ipmi_fans_mode_set 02
+            fi
+        else
+            log_debug "有高战比 CPU空占比低，最高频率运行"
+            ipmi_fans_mode_get
         fi
     else
         ipmi_fans_mode_get
