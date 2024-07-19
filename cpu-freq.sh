@@ -481,7 +481,7 @@ function Debug_log(){
     fi
     log_always "系统温度：$[$(cat /sys/class/thermal/thermal_zone0/temp)/1000]°"
     log_always "sensors获取到的CPU温度为：${cpu_temp_sensors_get}"
-    log_always "\n\n"
+    log_always "\n\n\n\n\n"
 }
 # ——————————————————————————————Debug信息函数结束——————————————————————————————
 
