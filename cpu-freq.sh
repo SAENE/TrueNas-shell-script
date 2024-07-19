@@ -61,31 +61,31 @@ LOG_FILE="/dev/null"
 #调试日志 
 function log_debug(){ 
     content="$(date '+%Y-%m-%d %H:%M:%S') $@" 
-    [ ${LOG_LEVEL} -le 1  ] && echo -e ${content} >> ${LOG_FILE} && echo -e "\033[46;37m[DEBUG]\033[0m" "\033[36m" ${content}  "\033[0m" 
+    [ ${LOG_LEVEL} -le 1  ] && echo -e "[ DEBUG ] " ${content} >> ${LOG_FILE} && echo -e "\033[46;37m[DEBUG]\033[0m" "\033[36m" ${content}  "\033[0m" 
 } 
 #信息日志 
 function log_info(){ 
     content="$(date '+%Y-%m-%d %H:%M:%S') $@" 
-    [ ${LOG_LEVEL} -le 2  ] && echo -e ${content} >> ${LOG_FILE} && echo -e "\033[42;37m[INFO]\033[0m" "\033[32m" ${content} "\033[0m" 
+    [ ${LOG_LEVEL} -le 2  ] && echo -e "[ INFO ] " ${content} >> ${LOG_FILE} && echo -e "\033[42;37m[INFO]\033[0m" "\033[32m" ${content} "\033[0m" 
 } 
 #警告日志 
 function log_warn(){ 
     content="$(date '+%Y-%m-%d %H:%M:%S') $@" 
-    [ ${LOG_LEVEL} -le 3  ] && echo -e ${content} >> ${LOG_FILE} && echo -e "\033[43;37m[WARN]\033[0m" "\033[33m" ${content} "\033[0m" 
+    [ ${LOG_LEVEL} -le 3  ] && echo -e "[ WARN ] " ${content} >> ${LOG_FILE} && echo -e "\033[43;37m[WARN]\033[0m" "\033[33m" ${content} "\033[0m" 
 } 
 #错误日志 
 function log_err(){ 
     content="$(date '+%Y-%m-%d %H:%M:%S') $@" 
-    [ ${LOG_LEVEL} -le 4  ] && echo -e ${content} >> ${LOG_FILE} && echo -e "\033[41;37m[ERROR]\033[0m" "\033[31m" ${content} "\033[0m" 
+    [ ${LOG_LEVEL} -le 4  ] && echo -e "[ ERROR ] " ${content} >> ${LOG_FILE} && echo -e "\033[41;37m[ERROR]\033[0m" "\033[31m" ${content} "\033[0m" 
 } 
 #一直都会打印的日志 
 function log_always(){ 
     content="$(date '+%Y-%m-%d %H:%M:%S') $@" 
-    [ ${LOG_LEVEL} -le 5  ] && echo -e ${content} >> ${LOG_FILE} && echo -e "\033[45;37m[ALWAYS]\033[0m" "\033[35m" ${content} "\033[0m" 
+    [ ${LOG_LEVEL} -le 5  ] && echo -e "[ ALWAYS ] " ${content} >> ${LOG_FILE} && echo -e "\033[45;37m[ALWAYS]\033[0m" "\033[35m" ${content} "\033[0m" 
 } 
 function log_ok(){ 
     content="$(date '+%Y-%m-%d %H:%M:%S') $@" 
-    [ ${LOG_LEVEL} -le 5  ] && echo -e ${content} >> ${LOG_FILE} && echo -e "\033[32m[ OK ] \033[0m" ${content}
+    [ ${LOG_LEVEL} -le 5  ] && echo -e "[ OK ] " ${content} >> ${LOG_FILE} && echo -e "\033[32m[ OK ] \033[0m" ${content}
 } 
 # ——————————————————————————————日志输出等级函数结束——————————————————————————————
 
