@@ -53,6 +53,9 @@ LOG_LEVEL=1
 # 日志存储位置
 LOG_FILE="/dev/null"
 
+# 特殊模式
+# 仅调频模式
+only_cpufreq_mode=false
 
 
 # ————————————————————————————————————————————函数开始————————————————————————————————————————————
@@ -88,6 +91,54 @@ function log_ok(){
     [ ${LOG_LEVEL} -le 5  ] && echo -e "[ OK ] " ${content} >> ${LOG_FILE} && echo -e "\033[32m[ OK ] \033[0m" ${content}
 } 
 # ——————————————————————————————日志输出等级函数结束——————————————————————————————
+
+
+# ——————————————————————————————检测是否符合运行条件——————————————————————————————
+# 检测是否符合运行条件
+function check_run_shell_condition(){
+    # 检测是否安装IPMItool
+    log_debug "检测是否安装IPMItool"
+    if ! type "ipmitool" > /dev/null 2>&1;then
+        log_warn "请安装ipmitool"
+        ipmi_enable=false
+    fi
+    log_ok "IPMITOOL安装检测完成"
+
+    log_debug "正在检查是否缺少运行所需要命令"
+    # 状态参数初始化
+    check_file_status="success"
+    check_cmd_status="success"
+    # 检测主要命令是否安装
+    check_cmd_list=(top cpufreq-set sed grep cat sort date uniq head awk sensors)
+    # 检测主要命令循环
+    for cmd_name in ${check_cmd_list[@]};do
+        log_debug "正在检测${cmd_name}命令"
+        if ! type "${cmd_name}" > /dev/null 2>&1;then
+            log_err "请安装${cmd_name}"
+            check_cmd_status="fail"
+        fi
+    done
+
+    log_debug "正在检查是否缺少运行所需要文件"
+    # 检测主要文件是否有
+    check_file_list=("/proc/cpuinfo" "/sys/devices/system/cpu/cpu0/cpufreq/")
+    # 检测主要文件循环
+    for file_name in ${check_file_list[@]};do
+        log_debug "正在检测${file_name}文件"
+        if [ ! -e "${file_name}" ];then
+            log_err "不存在${file_name}文件夹，无法允许本程序"
+            check_file_status="fail"
+        fi
+    done
+
+    # 判断文件或命令状态
+    if [[ "${check_file_status}" == "fail" || "${check_cmd_status}" == "fail" ]];then
+        log_err "文件或者命令不存在，请查看日志获取更多信息"
+        exit 1
+    fi
+    log_ok "运行所需命令和文件检测完成"
+}
+# ——————————————————————————————检测运行条件函数结束——————————————————————————————
 
 
 # ——————————————————————————————检测变量是否填写——————————————————————————————
@@ -133,7 +184,7 @@ function check_var_whether_null(){
 
     # 检测IPMI模式是否开启
     log_debug "检测IPMI模式是否设置"
-    if [ ! -n "${ipmi_enable}" ] && [[ "${ipmi_enable}" == "true" || "${ipmi_enable}" == "false" ]];then
+    if [ ! -n "${ipmi_enable}" ];then
         log_warn "ipmi_enablew未设置，默认为False"
         ipmi_enable=false
     fi
@@ -141,7 +192,7 @@ function check_var_whether_null(){
 
     # 检测夜晚模式
     log_debug "检测夜晚模式是否设置及其是否设置正确"
-    if [ ! -n "${night_quiet}" ] && [[ "${night_quiet}" == "true" || "${night_quiet}" == "false" ]];then
+    if [ ! -n "${night_quiet}" ];then
         log_warn "night_quiet未设置，默认为False"
         night_quiet=false
     fi
@@ -152,37 +203,8 @@ function check_var_whether_null(){
     fi
     log_ok "检测夜晚模式完成"
 
-    # 检测CPU调频模式
-    log_debug "检测CPU调频模式是否设置及其是否设置正确"
-    # CPU调频模式列表
-    cpu_power_mode_list=("conservative" "performance" "powersave" "ondemand" "userspace" "schedutil")
-    # 状态参数初始化
-    cpu_power_mode_set_status=0
-    cpu_high_freq_power_mode_set_status=0
-    # 检测CPU调频模式循环
-    for cpu_power_mode_name in ${cpu_power_mode_list[@]};do
-        log_debug "现在的CPU调频模式名称是 ${cpu_power_mode_name}"
-        # 检测是否为空和参数是否正确
-        if [ -n "${cpu_power_mode}" ] && [[ "${cpu_power_mode}" == "${cpu_power_mode_name}" ]];then
-            cpu_power_mode_set_status=1
-        fi
-        # 检测是否为空和参数是否正确
-        if [ -n "${cpu_high_freq_power_mode}" ] && [[ "${cpu_high_freq_power_mode}" == "${cpu_power_mode_name}" ]];then
-            cpu_high_freq_power_mode_set_status=1
-        fi
-    done
-    # 判断检测状态
-    if [[ "${cpu_power_mode_set_status}" -ne 1 ]];then
-        log_warn "未设置CPU调频模式，默认为conservative"
-        cpu_power_mode="conservative"
-    fi
-    # 判断检测状态
-    if [[ "${cpu_high_freq_power_mode_set_status}" -ne 1 ]];then
-        log_warn "未设置CPU高频率调频模式，默认为performance"
-        cpu_high_freq_power_mode="performance"
-    fi
-    log_ok "检测CPU调频模式完成"
-
+    # 获取当前调频信息
+    now_cpu_info_freq_and_powermode=($(cpufreq-info -p))
     # 检测CPU频率限制
     log_debug "检测CPU频率限制是否设置"
     # 检测正常温度下最大频率
@@ -207,6 +229,39 @@ function check_var_whether_null(){
     fi
     log_ok "检测CPU频率限制设置完成"
 
+    # 检测CPU调频模式
+    log_debug "检测CPU调频模式是否设置及其是否设置正确"
+    # CPU调频模式列表
+    #cpu_power_mode_list=("conservative" "performance" "powersave" "ondemand" "userspace" "schedutil")
+    cpu_power_mode_list=($(cpufreq-info -g))
+    log_debug "目前CPU支持调频模式有：${cpu_power_mode_list[@]}，调频驱动为$(cpufreq-info -d)"
+    # 状态参数初始化
+    cpu_power_mode_set_status=0
+    cpu_high_freq_power_mode_set_status=0
+    # 检测CPU调频模式循环
+    for cpu_power_mode_name in ${cpu_power_mode_list[@]};do
+        log_debug "现在的CPU调频模式名称是 ${cpu_power_mode_name}"
+        # 检测是否为空和参数是否正确
+        if [ -n "${cpu_power_mode}" ] && [[ "${cpu_power_mode}" == "${cpu_power_mode_name}" ]];then
+            cpu_power_mode_set_status=1
+        fi
+        # 检测是否为空和参数是否正确
+        if [ -n "${cpu_high_freq_power_mode}" ] && [[ "${cpu_high_freq_power_mode}" == "${cpu_power_mode_name}" ]];then
+            cpu_high_freq_power_mode_set_status=1
+        fi
+    done
+    # 判断检测状态
+    if [[ "${cpu_power_mode_set_status}" -ne 1 ]];then
+        log_warn "未设置CPU调频模式，默认为powersave"
+        cpu_power_mode="powersave"
+    fi
+    # 判断检测状态
+    if [[ "${cpu_high_freq_power_mode_set_status}" -ne 1 ]];then
+        log_warn "未设置CPU高频率调频模式，默认为performance"
+        cpu_high_freq_power_mode="performance"
+    fi
+    log_ok "检测CPU调频模式完成"
+
     # 检测CPU空占比
     log_debug "检测CPU空占比设置"
     if [ ! -n "${cpu_min_idle}" ];then
@@ -222,56 +277,16 @@ function check_var_whether_null(){
         log_warn "未设置软件高占比，默认为150"
     fi
     log_ok "检测软件CPU占比设置完成"
+
+    # 检测仅调频模式
+    log_debug "检测仅调频模式是否开启或者设置"
+    if [ ! -n "${only_cpufreq_mode}" ];then
+        log_warn "only_cpufreq_mode未设置，默认为False"
+        only_cpufreq_mode=false
+    fi
+    log_ok "检测仅调频模式完成"
 }
 # ——————————————————————————————检测变量函数结束——————————————————————————————
-
-
-# ——————————————————————————————检测是否符合运行条件——————————————————————————————
-# 检测是否符合运行条件
-function check_run_shell_condition(){
-    # 检测是否安装IPMItool
-    log_debug "检测是否安装IPMItool"
-    if ! type "ipmitool" > /dev/null 2>&1 && [[ "${ipmi_enable}" == "true" ]];then
-        log_warn "请安装ipmitool"
-        ipmi_enable=false
-    fi
-    log_ok "IPMITOOL安装检测完成"
-
-    log_debug "正在检查是否缺少运行所需要命令"
-    # 状态参数初始化
-    check_file_status="success"
-    check_cmd_status="success"
-    # 检测主要命令是否安装
-    check_cmd_list=(top cpufreq-set sed grep cat sort date uniq head awk sensors)
-    # 检测主要命令循环
-    for cmd_name in ${check_cmd_list[@]};do
-        log_debug "正在检测${cmd_name}命令"
-        if ! type "${cmd_name}" > /dev/null 2>&1;then
-            log_err "请安装${cmd_name}"
-            check_cmd_status="fail"
-        fi
-    done
-
-    log_debug "正在检查是否缺少运行所需要文件"
-    # 检测主要文件是否有
-    check_file_list=("/proc/cpuinfo" "/sys/devices/system/cpu/cpu0/cpufreq/")
-    # 检测主要文件循环
-    for file_name in ${check_file_list[@]};do
-        log_debug "正在检测${file_name}文件"
-        if [ ! -e "${file_name}" ];then
-            log_err "不存在${file_name}文件夹，无法允许本程序"
-            check_file_status="fail"
-        fi
-    done
-
-    # 判断文件或命令状态
-    if [[ "${check_file_status}" == "fail" || "${check_cmd_status}" == "fail" ]];then
-        log_err "文件或者命令不存在，请查看日志获取更多信息"
-        exit 1
-    fi
-    log_ok "运行所需命令和文件检测完成"
-}
-# ——————————————————————————————检测运行条件函数结束——————————————————————————————
 
 
 # ——————————————————————————————IPMI设置开始——————————————————————————————
@@ -558,15 +573,15 @@ function CPU_INFO_COMPARED(){
 
 
 # ————————————————————————————————————————————函数运行————————————————————————————————————————————
-# 检测变量
-log_always "———————————————检测变量是否填写，变量初始化中———————————————"
-check_var_whether_null
-log_always "———————————————变量初始化完成———————————————"
-log_always "\n"
 # 检测是否满足运行条件
 log_always "———————————————检测是否符合运行条件———————————————"
 check_run_shell_condition
 log_always "———————————————运行条件检测完成———————————————"
+log_always "\n"
+# 检测变量
+log_always "———————————————检测变量是否填写，变量初始化中———————————————"
+check_var_whether_null
+log_always "———————————————变量初始化完成———————————————"
 log_always "\n"
 # 获取CPU信息
 log_always "———————————————开始获取CPU信息———————————————"
@@ -584,6 +599,18 @@ log_always "\n"
 
 # ————————————————————————————————————————————开始运行————————————————————————————————————————————
 log_always "———————————————开始运行———————————————"
+# ——————————————————————————————特殊模式——————————————————————————————
+# 仅调频模式
+if [[ "${only_cpufreq_mode}" == "enable" ]];then
+log_debug "开启仅调节模式，仅调整频率和调频模式"
+    cpu_freq_set ${cpu_power_mode} ${cpu_normal_temp_limit_max_freq} ${cpu_temp_limit_min_freq}
+    Debug_log
+    exit 0;
+fi
+
+# ——————————————————————————————特殊模式结束——————————————————————————————
+
+
 # ——————————————————————————————安静及夜晚模式——————————————————————————————
 # 夜晚模式以及强制模式
 # 检测是否开启安静模式
